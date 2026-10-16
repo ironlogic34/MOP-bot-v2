@@ -59,7 +59,7 @@ class Market(commands.Cog):
     @app_commands.command(description="Show your globally owned market items.")
     async def inventory(self,interaction:discord.Interaction):
         rows=await self.bot.storage.rows("SELECT i.item_id,i.quantity,m.name FROM inventory i JOIN market_items m ON m.id=i.item_id WHERE i.user_id=? AND i.quantity>0 ORDER BY i.item_id",(interaction.user.id,))
-        view=Paginator("Your inventory",[f"#{r['item_id']} {r['name']} × {r['quantity']}" for r in rows])
+        view=Paginator("Your inventory",[f"#{r['item_id']} {r['name']} × {r['quantity']}" for r in rows],owner_id=interaction.user.id)
         await interaction.response.send_message(embed=view.embed(),view=view,ephemeral=True)
 
 async def setup(bot):
