@@ -12,6 +12,10 @@ async def handle_error(interaction, error):
         message = str(error) or "Permission denied."
     else:
         log.error("Command failed: %s: %s", interaction.command, redact_secrets(error))
+        try:
+            await record(interaction.client.storage, interaction.guild_id, getattr(interaction.command, "name", "unknown"), error)
+        except Exception:
+            log.exception("Error persistence failed")
         message = "Command failed. The error was logged."
     try:
         if interaction.response.is_done():
