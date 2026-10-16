@@ -1,5 +1,6 @@
 import logging
 from shared.security.redaction import redact_secrets
+from modules.error_handling.repositories.error_records import record
 from discord import app_commands
 
 log = logging.getLogger("mop.errors")
