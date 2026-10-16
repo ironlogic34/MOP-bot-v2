@@ -4,6 +4,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from core.permissions import require_staff
+from shared.security.mentions import SAFE_MENTIONS
 
 class Automation(commands.Cog):
     def __init__(self, bot):
@@ -37,7 +38,7 @@ class Automation(commands.Cog):
         rules = await self.bot.storage.rows("SELECT trigger,response FROM responders WHERE guild_id=?",(message.guild.id,))
         for rule in rules:
             if re.search(r"(?<!\w)"+re.escape(rule["trigger"])+r"(?!\w)",text):
-                await message.reply(rule["response"],mention_author=False,allowed_mentions=discord.AllowedMentions.none())
+                await message.reply(rule["response"],mention_author=False,allowed_mentions=SAFE_MENTIONS)
                 break
         reactions = await self.bot.storage.rows("SELECT trigger,emoji FROM reactions WHERE guild_id=?",(message.guild.id,))
         added = set()
