@@ -1,5 +1,6 @@
 """Member moderation: permission and hierarchy protected."""
 from datetime import timedelta
+from modules.moderation.services.sanctions import schedule_unban, cancel_unban
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -14,9 +15,13 @@ class Members(commands.Cog):
     @app_commands.default_permissions(ban_members=True)
     @app_commands.guild_only()
     @app_commands.checks.has_permissions(ban_members=True)
-    async def ban(self, interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
+    async def ban(self, interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided", duration_minutes: app_commands.Range[int,1,525600] | None = None):
         check_hierarchy(interaction.user, member, interaction.guild.me)
         await interaction.guild.ban(member, reason=reason)
+        if duration_minutes is not None:
+            await schedule_unban(self.bot.storage,interaction.guild_id,member.id,duration_minutes,reason)
+        else:
+            await cancel_unban(self.bot.storage,interaction.guild_id,member.id)
         await self.bot.storage.log(interaction.guild_id, interaction.user.id, member.id, "ban", reason)
         await interaction.response.send_message(f"Banned {member.mention}.", ephemeral=True)
 
@@ -27,6 +32,7 @@ class Members(commands.Cog):
     async def unban(self, interaction: discord.Interaction, user_id: str):
         user = await self.bot.fetch_user(parse_discord_id(user_id))
         await interaction.guild.unban(user)
+        await cancel_unban(self.bot.storage,interaction.guild_id,user.id)
         await self.bot.storage.log(interaction.guild_id, interaction.user.id, user.id, "unban")
         await interaction.response.send_message(f"Unbanned {user}.", ephemeral=True)
 
