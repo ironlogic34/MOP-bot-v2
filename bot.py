@@ -9,12 +9,15 @@ from core.database import Database
 from core.errors import handle_error
 from shared.helpers.events import EventBus
 from modules.economy.services.ledger import Ledger
+from modules.moderation.services.sanctions import initialize as initialize_sanctions
 from modules.utility.services.schema import initialize as initialize_utility
 from modules.music.services.player import Player
 from modules.error_handling.services.monitor import install_loop_handler
 
 EXTENSIONS = (
     "modules.moderation.cogs.members",
+    "modules.moderation.cogs.audit",
+    "modules.moderation.cogs.sanction_worker",
     "modules.moderation.cogs.channels",
     "modules.moderation.cogs.warnings",
     "modules.moderation.cogs.history",
@@ -51,6 +54,7 @@ class MopBot(commands.Bot):
         install_loop_handler(asyncio.get_running_loop())
         await self.storage.open()
         await self.ledger.initialize()
+        await initialize_sanctions(self.storage)
         await initialize_utility(self.storage)
         for extension in EXTENSIONS:
             await self.load_extension(extension)
