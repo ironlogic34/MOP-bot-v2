@@ -1,4 +1,5 @@
 import logging
+from shared.security.redaction import redact_secrets
 from discord import app_commands
 
 log = logging.getLogger("mop.errors")
@@ -9,7 +10,7 @@ async def handle_error(interaction, error):
     if isinstance(error, app_commands.CheckFailure):
         message = str(error) or "Permission denied."
     else:
-        log.exception("Command failed: %s", interaction.command, exc_info=error)
+        log.error("Command failed: %s: %s", interaction.command, redact_secrets(error))
         message = "Command failed. The error was logged."
     try:
         if interaction.response.is_done():
