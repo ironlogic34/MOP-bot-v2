@@ -2,7 +2,7 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-from core.ui import Pages
+from shared.ui.pagination import Paginator
 from shared.validators.text import normalized_product_name
 
 class Market(commands.Cog):
@@ -16,7 +16,7 @@ class Market(commands.Cog):
         else:
             rows=await self.bot.storage.rows("SELECT * FROM market_items WHERE active=1 ORDER BY id LIMIT 100")
         lines=[f"**#{r['id']} {discord.utils.escape_markdown(r['name'])}** | {r['price']} Points | Stock: {r['stock']} | Server: {r['guild_id']}" for r in rows]
-        view=Pages("Global MOP Market",lines,page_size=7)
+        view=Paginator("Global MOP Market",lines,owner_id=interaction.user.id,page_size=7)
         await interaction.response.send_message(embed=view.embed(),view=view,ephemeral=True)
 
     @app_commands.command(description="Publish an item in the global marketplace (server owner only).")
@@ -59,7 +59,7 @@ class Market(commands.Cog):
     @app_commands.command(description="Show your globally owned market items.")
     async def inventory(self,interaction:discord.Interaction):
         rows=await self.bot.storage.rows("SELECT i.item_id,i.quantity,m.name FROM inventory i JOIN market_items m ON m.id=i.item_id WHERE i.user_id=? AND i.quantity>0 ORDER BY i.item_id",(interaction.user.id,))
-        view=Pages("Your inventory",[f"#{r['item_id']} {r['name']} × {r['quantity']}" for r in rows])
+        view=Paginator("Your inventory",[f"#{r['item_id']} {r['name']} × {r['quantity']}" for r in rows])
         await interaction.response.send_message(embed=view.embed(),view=view,ephemeral=True)
 
 async def setup(bot):
