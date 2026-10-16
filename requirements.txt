@@ -1,0 +1,5 @@
+discord.py>=2.4,<3
+aiosqlite>=0.20,<1
+python-dotenv>=1.0,<2
+Pillow>=10,<12
+PyNaCl>=1.5,<2
