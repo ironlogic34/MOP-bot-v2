@@ -12,6 +12,7 @@ from shared.helpers.events import EventBus
 from modules.economy.services.ledger import Ledger
 from modules.moderation.services.sanctions import initialize as initialize_sanctions
 from modules.moderation.services.channel_overwrites import initialize as initialize_locks
+from modules.server_management.services.member_rules import initialize as initialize_member_rules
 from modules.utility.services.schema import initialize as initialize_utility
 from modules.music.services.player import Player
 from modules.error_handling.services.monitor import install_loop_handler
@@ -29,6 +30,7 @@ EXTENSIONS = (
     "modules.server_management.cogs.automation",
     "modules.server_management.cogs.leveling",
     "modules.server_management.cogs.support",
+    "modules.server_management.cogs.member_rules",
     "modules.utility.cogs.reminders",
     "modules.utility.cogs.channel_tools",
     "modules.utility.cogs.conversion",
@@ -59,6 +61,7 @@ class MopBot(commands.Bot):
         await self.ledger.initialize()
         await initialize_sanctions(self.storage)
         await initialize_locks(self.storage)
+        await initialize_member_rules(self.storage)
         await initialize_errors(self.storage)
         await initialize_utility(self.storage)
         for extension in EXTENSIONS:
