@@ -2,7 +2,7 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-from core.ui import Pages
+from shared.ui.pagination import Paginator
 
 CATEGORIES={
     "Moderation":("ban","unban","kick","mute","unmute","warn","warnhistory","modhistory","lock","unlock","slowmode","cleanup","nsfw","sfw","role","nickname","history","stat","mkdstat"),
@@ -25,7 +25,7 @@ class CategoryPicker(discord.ui.Select):
             cmd=known.get(name)
             if cmd:
                 entries.append(f"**/{name}** — {cmd.description[:100]}")
-        view=Pages(f"MOP Help • {self.values[0]}",entries,page_size=7)
+        view=Paginator(f"MOP Help • {self.values[0]}",entries,owner_id=interaction.user.id,page_size=7)
         await interaction.response.send_message(embed=view.embed(),view=view,ephemeral=True)
 
 class HelpView(discord.ui.View):
