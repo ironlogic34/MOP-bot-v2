@@ -34,3 +34,7 @@ class EventBus:
             except Exception:
                 log.exception("Event handler failed for %s", name)
         return completed
+
+    def subscribers(self, name: str) -> int:
+        """Return the number of registered handlers for an event."""
+        return len(self._subscribers.get(name, ()))
