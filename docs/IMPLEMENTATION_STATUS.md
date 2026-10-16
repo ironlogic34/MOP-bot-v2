@@ -21,3 +21,14 @@ Working: independent guild settings, SQLite schema creation, shared audit log, b
 Next: migrations, permission engine expansion, background queues, persistent views, per-guild module toggles, structured health monitoring, test suite, development/production separation, SQLite-to-PostgreSQL abstraction.
 
 Do not advertise this branch as a complete 83-command release.
+
+
+## Second batch: remaining modules
+The previously empty module folders now contain working initial implementations and are loaded by `bot.py`:
+- **Utility:** /timer, /notify, /pin, /unpin, /img2gif. /bumpreminder pending. Reminder delivery is currently at-most-once, and reports are stored but lack a staff dashboard.
+- **Music:** /music, /play, /pause, /resume, /skip, /queue, /nowplaying, /volume, /loop, /shuffle, /stop, /lyrics, /fm, /lastfm. Last.fm integration is a status stub; scrobbling and statistics pending. Direct audio is **disabled until MUSIC_ALLOWED_HOSTS is configured**. FFmpeg required. Voice session hardening and richer controls pending.
+- **Economy:** /economy, /balance, /daily, /work, /deposit, /withdraw, /transfer, /leaderboard, /market, /inventory, /buy, /sell, /additem. Global points, inventory and market purchase/sell use SQLite transactions. /addbalance, /resetbalance, /credit, /loan and listing management pending. Listing products are virtual; redemption and eligibility controls pending.
+- **Help:** /help category selector and compact descriptions.
+- **Background errors:** loop-level handler and cog event error monitoring. Persistent structured error records, redaction and recovery pending.
+
+**Security:** Set `MUSIC_ALLOWED_HOSTS` only to domains you trust for direct audio streaming. An allowlist alone does not fully protect against DNS rebinding or redirects; audio source handling needs additional hardening before public deployment. Real secrets belong only in local `.env`, not Git.
