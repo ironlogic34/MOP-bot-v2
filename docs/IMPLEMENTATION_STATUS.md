@@ -39,3 +39,6 @@ This pass adds a **restart-persistent moderation sanction scheduler**, timed ban
 **Not a complete implementation.** Remaining specification gaps include advanced moderation commands and retention, comprehensive server management (backup, appeals, ticket workflows, autoroles), full general command behavior, utility delivery semantics, economy administration/credit/loan, permission-aware help, and durable background infrastructure. Music remains deferred. The shared package still lacks durable events and persistent UI. No live Discord integration tests have been run.
 
 A green compile/import/unit-test workflow does not establish production readiness.
+
+## Latest batch
+New commands: /lockdown, /denyperm, /hide, /botclear, /alias, /autorole, /leave, /live, /language. Channel locks now preserve previous overwrite values. General commands gained uptime, aliases, and bounded announcements. These changes are partial: translations, automated backups, appeals, advanced ticket flows, credit and loans remain incomplete. No live Discord testing performed.
