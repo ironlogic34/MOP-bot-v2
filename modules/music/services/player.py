@@ -1,5 +1,6 @@
 """One audio session per guild, for authorized direct audio URLs only."""
 import asyncio
+import os
 import ipaddress
 import socket
 from urllib.parse import urlsplit
@@ -17,7 +18,10 @@ class Player:
         parsed=urlsplit(url)
         if parsed.scheme!="https" or not parsed.hostname or parsed.username or parsed.password:
             raise ValueError("Use a public HTTPS direct audio URL.")
-        host=parsed.hostname
+        host=parsed.hostname.lower().rstrip(".")
+        allowed={h.strip().lower() for h in os.getenv("MUSIC_ALLOWED_HOSTS","").split(",") if h.strip()}
+        if not allowed or host not in allowed:
+            raise ValueError("Audio host not approved. Configure MUSIC_ALLOWED_HOSTS with trusted hosts first.")
         try:
             addresses=await asyncio.get_running_loop().getaddrinfo(host,443,type=socket.SOCK_STREAM)
         except OSError:
@@ -45,11 +49,12 @@ class Player:
         self.current[guild.id]=url
         source=discord.FFmpegPCMAudio(url,options="-vn",before_options="-nostdin -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5")
         source=discord.PCMVolumeTransformer(source,volume=self.volume.get(guild.id,0.7))
+        loop=asyncio.get_running_loop()
         def after(error):
             if error:
                 import logging
                 logging.getLogger("mop.music").error("Playback failed: %s",error)
             if self.loop.get(guild.id) and self.current.get(guild.id):
                 self.queue(guild.id).insert(0,self.current[guild.id])
-            asyncio.run_coroutine_threadsafe(self.play_next(guild),guild._state.loop)
+            asyncio.run_coroutine_threadsafe(self.play_next(guild),loop)
         voice.play(source,after=after)
