@@ -2,6 +2,7 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
+from modules.moderation.services.channel_overwrites import lock_channel, unlock_channel
 
 class Channels(commands.Cog):
     def __init__(self, bot):
@@ -25,7 +26,7 @@ class Channels(commands.Cog):
     @app_commands.checks.has_permissions(manage_channels=True)
     async def lock(self, interaction: discord.Interaction, channel: discord.TextChannel | None = None):
         channel = channel or interaction.channel
-        await channel.set_permissions(interaction.guild.default_role, send_messages=False, reason=f"Locked by {interaction.user}")
+        await lock_channel(self.bot.storage,channel,interaction.guild.default_role,interaction.user)
         await self.bot.storage.log(interaction.guild_id, interaction.user.id, channel.id, "lock")
         await interaction.response.send_message(f"Locked {channel.mention}.", ephemeral=True)
 
@@ -35,9 +36,7 @@ class Channels(commands.Cog):
     @app_commands.checks.has_permissions(manage_channels=True)
     async def unlock(self, interaction: discord.Interaction, channel: discord.TextChannel | None = None):
         channel = channel or interaction.channel
-        overwrite = channel.overwrites_for(interaction.guild.default_role)
-        overwrite.send_messages = None
-        await channel.set_permissions(interaction.guild.default_role, overwrite=overwrite, reason=f"Unlocked by {interaction.user}")
+        await unlock_channel(self.bot.storage,channel,interaction.guild.default_role,interaction.user)
         await self.bot.storage.log(interaction.guild_id, interaction.user.id, channel.id, "unlock")
         await interaction.response.send_message(f"Unlocked {channel.mention}.", ephemeral=True)
 
