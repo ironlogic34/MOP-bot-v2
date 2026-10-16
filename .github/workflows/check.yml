@@ -13,3 +13,4 @@ jobs:
       - run: python -m compileall -q bot.py core modules
       - run: pip install -r requirements.txt
       - run: python -c "import bot; print('Imports OK')"
+      - run: python -m unittest discover -s tests -v
