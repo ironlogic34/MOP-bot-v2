@@ -2,6 +2,7 @@
 import asyncio
 import logging
 import os
+import time
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
@@ -49,6 +50,7 @@ class MopBot(commands.Bot):
         intents.message_content = True
         intents.presences = True
         super().__init__(command_prefix=commands.when_mentioned, intents=intents)
+        self.started_at = time.monotonic()
         self.storage = Database(os.getenv("DATABASE_PATH", "data/mop.sqlite3"))
         self.tree.on_error = handle_error
         self.ledger = Ledger(self.storage)
