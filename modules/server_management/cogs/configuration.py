@@ -10,6 +10,7 @@ class Configuration(commands.Cog):
     @app_commands.command(description="View this server's MOP configuration.")
     @app_commands.default_permissions(manage_guild=True)
     @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
     async def customise(self, interaction: discord.Interaction):
         data = await self.bot.storage.settings(interaction.guild_id)
         lines = [f"{k}: {v}" for k,v in sorted(data.items())]
@@ -18,6 +19,7 @@ class Configuration(commands.Cog):
     @app_commands.command(description="Set the welcome channel and message.")
     @app_commands.default_permissions(manage_guild=True)
     @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
     async def welcome(self, interaction: discord.Interaction, channel: discord.TextChannel, message: str):
         await self.bot.storage.set_setting(interaction.guild_id,"welcome",{"channel":channel.id,"message":message[:1000]})
         await interaction.response.send_message("Welcome message configured.",ephemeral=True)
