@@ -73,9 +73,13 @@ class Ledger:
             db=self.storage.db
             await db.execute("BEGIN IMMEDIATE")
             try:
-                cur=await db.execute("UPDATE economy_accounts SET wallet=wallet-? WHERE user_id=? AND wallet>=?",(amount,sender,amount))
+                # Borrowed Points must stay with the borrower: only the part of the
+                # wallet above the outstanding debt may be transferred away.
+                async with db.execute("SELECT COALESCE(SUM(outstanding),0) AS owed FROM point_loans WHERE user_id=? AND status='active'",(sender,)) as cur:
+                    owed=(await cur.fetchone())["owed"]
+                cur=await db.execute("UPDATE economy_accounts SET wallet=wallet-? WHERE user_id=? AND wallet-?>=?",(amount,sender,amount,owed))
                 if cur.rowcount!=1:
-                    raise ValueError("Insufficient points.")
+                    raise ValueError("Insufficient transferable Points. Borrowed Points cannot be transferred while a loan is outstanding." if owed else "Insufficient points.")
                 await db.execute("UPDATE economy_accounts SET wallet=wallet+? WHERE user_id=?",(amount,receiver))
                 await db.execute("INSERT INTO economy_transfers(sender,receiver,amount) VALUES(?,?,?)",(sender,receiver,amount))
                 await db.commit()

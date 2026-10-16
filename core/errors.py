@@ -10,6 +10,8 @@ async def handle_error(interaction, error):
         error = error.original
     if isinstance(error, app_commands.CheckFailure):
         message = str(error) or "Permission denied."
+    elif isinstance(error, app_commands.CommandOnCooldown):
+        message = f"Slow down. Try again in {int(error.retry_after) + 1}s."
     else:
         log.error("Command failed: %s: %s", interaction.command, redact_secrets(error))
         try:

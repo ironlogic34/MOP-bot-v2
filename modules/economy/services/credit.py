@@ -1,5 +1,16 @@
-"""Global interest-free virtual Points credit and loan service."""
+"""Global interest-free virtual Points credit and loan service.
+
+Loans are interest-free but not free money: borrowers must have an established
+Discord account and some earning history, overdue loans are collected from the
+borrower's wallet then savings, and borrowing is blocked while any loan is
+overdue. Borrowed Points cannot be transferred away (see Ledger.transfer).
+"""
 from datetime import datetime, timedelta, timezone
+
+MAX_CREDIT = 5000
+LOAN_TERM_DAYS = 14
+MIN_ACCOUNT_AGE_DAYS = 30
+MIN_DAILY_CLAIMS = 3
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS point_loans(
@@ -61,29 +72,67 @@ async def reset(storage,actor_id,user_id,reason):
             await db.rollback()
             raise
 
-async def borrow(storage,user_id,amount):
-    if not 1<=amount<=5000:
-        raise ValueError("Loan amount must be between 1 and 5,000 Points.")
+async def borrow(storage,user_id,amount,*,account_age_days):
+    if not 1<=amount<=MAX_CREDIT:
+        raise ValueError(f"Loan amount must be between 1 and {MAX_CREDIT:,} Points.")
+    if account_age_days<MIN_ACCOUNT_AGE_DAYS:
+        raise ValueError(f"Your Discord account must be at least {MIN_ACCOUNT_AGE_DAYS} days old to borrow.")
     now=datetime.now(timezone.utc)
     async with storage.lock:
         db=storage.db
         await db.execute("BEGIN IMMEDIATE")
         try:
             await db.execute("INSERT OR IGNORE INTO economy_accounts(user_id) VALUES(?)",(user_id,))
+            async with db.execute("SELECT COUNT(*) AS n FROM economy_transactions WHERE user_id=? AND action='last_daily'",(user_id,)) as cur:
+                claims=(await cur.fetchone())["n"]
+            if claims<MIN_DAILY_CLAIMS:
+                raise ValueError(f"Claim /daily at least {MIN_DAILY_CLAIMS} times before borrowing ({claims} so far).")
+            async with db.execute("SELECT 1 FROM point_loans WHERE user_id=? AND status='active' AND due_at<=? LIMIT 1",(user_id,now.isoformat())) as cur:
+                if await cur.fetchone():
+                    raise ValueError("You have an overdue loan. Repay it before borrowing again.")
             async with db.execute("SELECT COALESCE(SUM(outstanding),0) AS owed FROM point_loans WHERE user_id=? AND status='active'",(user_id,)) as cur:
                 owed=(await cur.fetchone())["owed"]
-            if owed+amount>5000:
-                raise ValueError("Maximum outstanding credit is 5,000 Points.")
+            if owed+amount>MAX_CREDIT:
+                raise ValueError(f"Maximum outstanding credit is {MAX_CREDIT:,} Points.")
             await db.execute("UPDATE economy_accounts SET wallet=wallet+? WHERE user_id=?",(amount,user_id))
-            await db.execute("INSERT INTO point_loans(user_id,principal,outstanding,issued_at,due_at) VALUES(?,?,?,?,?)",(user_id,amount,amount,now.isoformat(),(now+timedelta(days=14)).isoformat()))
+            await db.execute("INSERT INTO point_loans(user_id,principal,outstanding,issued_at,due_at) VALUES(?,?,?,?,?)",(user_id,amount,amount,now.isoformat(),(now+timedelta(days=LOAN_TERM_DAYS)).isoformat()))
             await db.commit()
         except Exception:
             await db.rollback()
             raise
 
+async def collect_overdue(storage,now=None):
+    """Collect overdue loans from wallet, then savings. Returns Points collected."""
+    now=now or datetime.now(timezone.utc)
+    collected=0
+    async with storage.lock:
+        db=storage.db
+        await db.execute("BEGIN IMMEDIATE")
+        try:
+            async with db.execute("SELECT id,user_id,outstanding FROM point_loans WHERE status='active' AND due_at<=? ORDER BY due_at,id",(now.isoformat(),)) as cur:
+                loans=await cur.fetchall()
+            for loan in loans:
+                async with db.execute("SELECT wallet,savings FROM economy_accounts WHERE user_id=?",(loan["user_id"],)) as cur:
+                    account=await cur.fetchone()
+                if account is None:
+                    continue
+                from_wallet=min(account["wallet"],loan["outstanding"])
+                from_savings=min(account["savings"],loan["outstanding"]-from_wallet)
+                paid=from_wallet+from_savings
+                if not paid:
+                    continue
+                await db.execute("UPDATE economy_accounts SET wallet=wallet-?,savings=savings-? WHERE user_id=?",(from_wallet,from_savings,loan["user_id"]))
+                await db.execute("UPDATE point_loans SET outstanding=outstanding-?,status=CASE WHEN outstanding-?=0 THEN 'repaid' ELSE 'active' END WHERE id=?",(paid,paid,loan["id"]))
+                collected+=paid
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            raise
+    return collected
+
 async def repay(storage,user_id,amount):
-    if not 1<=amount<=5000:
-        raise ValueError("Repayment must be between 1 and 5,000 Points.")
+    if not 1<=amount<=MAX_CREDIT:
+        raise ValueError(f"Repayment must be between 1 and {MAX_CREDIT:,} Points.")
     async with storage.lock:
         db=storage.db
         await db.execute("BEGIN IMMEDIATE")
