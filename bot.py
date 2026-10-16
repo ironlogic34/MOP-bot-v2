@@ -7,6 +7,10 @@ from discord.ext import commands
 from dotenv import load_dotenv
 from core.database import Database
 from core.errors import handle_error
+from modules.economy.services.ledger import Ledger
+from modules.utility.services.schema import initialize as initialize_utility
+from modules.music.services.player import Player
+from modules.error_handling.services.monitor import install_loop_handler
 
 EXTENSIONS = (
     "modules.moderation.cogs.members",
@@ -18,6 +22,15 @@ EXTENSIONS = (
     "modules.server_management.cogs.automation",
     "modules.server_management.cogs.leveling",
     "modules.server_management.cogs.support",
+    "modules.utility.cogs.reminders",
+    "modules.utility.cogs.channel_tools",
+    "modules.utility.cogs.conversion",
+    "modules.music.cogs.playback",
+    "modules.music.cogs.lastfm",
+    "modules.economy.cogs.accounts",
+    "modules.economy.cogs.market",
+    "modules.help.cogs.help",
+    "modules.error_handling.cogs.error_monitor",
 )
 
 class MopBot(commands.Bot):
@@ -29,9 +42,14 @@ class MopBot(commands.Bot):
         super().__init__(command_prefix=commands.when_mentioned, intents=intents)
         self.storage = Database(os.getenv("DATABASE_PATH", "data/mop.sqlite3"))
         self.tree.on_error = handle_error
+        self.ledger = Ledger(self.storage)
+        self.player = Player()
 
     async def setup_hook(self):
+        install_loop_handler(asyncio.get_running_loop())
         await self.storage.open()
+        await self.ledger.initialize()
+        await initialize_utility(self.storage)
         for extension in EXTENSIONS:
             await self.load_extension(extension)
         await self.tree.sync()
