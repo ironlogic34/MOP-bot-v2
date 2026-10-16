@@ -12,7 +12,8 @@ class Market(commands.Cog):
     @app_commands.command(description="Browse global MOP marketplace listings.")
     async def market(self,interaction:discord.Interaction,search:str|None=None):
         if search:
-            rows=await self.bot.storage.rows("SELECT * FROM market_items WHERE active=1 AND normalized_name LIKE ? ORDER BY id LIMIT 100",("%"+search.strip().casefold()+"%",))
+            term=search.strip().casefold().replace("\\","\\\\").replace("%","\\%").replace("_","\\_")
+            rows=await self.bot.storage.rows("SELECT * FROM market_items WHERE active=1 AND normalized_name LIKE ? ESCAPE '\\' ORDER BY id LIMIT 100",("%"+term+"%",))
         else:
             rows=await self.bot.storage.rows("SELECT * FROM market_items WHERE active=1 ORDER BY id LIMIT 100")
         lines=[f"**#{r['id']} {discord.utils.escape_markdown(r['name'])}** | {r['price']} Points | Stock: {r['stock']} | Server: {r['guild_id']}" for r in rows]
@@ -48,7 +49,7 @@ class Market(commands.Cog):
         except ValueError as exc:
             await interaction.response.send_message(str(exc),ephemeral=True)
 
-    @app_commands.command(description="Sell an eligible owned item for 75% of its current price.")
+    @app_commands.command(description="Sell an owned item back for 75% of what you originally paid.")
     async def sell(self,interaction:discord.Interaction,item_id:int,quantity:app_commands.Range[int,1,100]=1):
         try:
             payout=await self.bot.ledger.sell(interaction.user.id,item_id,quantity)
@@ -67,8 +68,8 @@ class Market(commands.Cog):
     @app_commands.guild_only()
     async def edititem(self, interaction:discord.Interaction, item_id:int, price:app_commands.Range[int,1,100000000]|None=None, stock:app_commands.Range[int,0,100000]|None=None, active:bool|None=None, description:app_commands.Range[str,1,500]|None=None):
         rows=await self.bot.storage.rows("SELECT owner_id,guild_id FROM market_items WHERE id=?",(item_id,))
-        if not rows or rows[0]["owner_id"]!=interaction.user.id or rows[0]["guild_id"]!=interaction.guild_id:
-            raise app_commands.CheckFailure("Only the original listing owner can manage this server's listing.")
+        if not rows or rows[0]["owner_id"]!=interaction.user.id or rows[0]["guild_id"]!=interaction.guild_id or interaction.user.id!=interaction.guild.owner_id:
+            raise app_commands.CheckFailure("Only the original listing owner, while still this server's owner, can manage this listing.")
         changes={"price":price,"stock":stock,"active":int(active) if active is not None else None,"description":description}
         selected={key:value for key,value in changes.items() if value is not None}
         if not selected:

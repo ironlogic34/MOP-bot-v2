@@ -2,14 +2,17 @@
 import asyncio
 from datetime import datetime, timezone
 from core.database import Database
+from modules.economy.services.credit import SCHEMA as CREDIT_SCHEMA
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS economy_accounts(user_id INTEGER PRIMARY KEY, wallet INTEGER NOT NULL DEFAULT 0 CHECK(wallet>=0), savings INTEGER NOT NULL DEFAULT 0 CHECK(savings>=0), last_daily TEXT, last_work TEXT);
 CREATE TABLE IF NOT EXISTS economy_transfers(id INTEGER PRIMARY KEY AUTOINCREMENT, sender INTEGER NOT NULL, receiver INTEGER NOT NULL, amount INTEGER NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS market_items(id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id INTEGER NOT NULL, owner_id INTEGER NOT NULL, name TEXT NOT NULL, normalized_name TEXT NOT NULL UNIQUE, description TEXT NOT NULL, price INTEGER NOT NULL CHECK(price>0), stock INTEGER NOT NULL CHECK(stock>=0), active INTEGER NOT NULL DEFAULT 1);
-CREATE TABLE IF NOT EXISTS inventory(user_id INTEGER NOT NULL, item_id INTEGER NOT NULL, quantity INTEGER NOT NULL CHECK(quantity>=0), PRIMARY KEY(user_id,item_id));
+CREATE TABLE IF NOT EXISTS inventory(user_id INTEGER NOT NULL, item_id INTEGER NOT NULL, quantity INTEGER NOT NULL CHECK(quantity>=0), cost_total INTEGER NOT NULL DEFAULT 0 CHECK(cost_total>=0), PRIMARY KEY(user_id,item_id));
 CREATE TABLE IF NOT EXISTS economy_transactions(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, action TEXT NOT NULL, amount INTEGER NOT NULL, item_id INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP);
-"""
+""" + CREDIT_SCHEMA
+
+SELL_RATE_PERCENT = 75
 
 class Ledger:
     def __init__(self, storage: Database):
@@ -18,7 +21,27 @@ class Ledger:
     async def initialize(self):
         async with self.storage.lock:
             await self.storage.db.executescript(SCHEMA)
+            await self._migrate_cost_basis()
             await self.storage.db.commit()
+
+    async def _migrate_cost_basis(self):
+        """Older databases have no inventory.cost_total.
+
+        Backfill it from what holders actually paid (their recorded buy spend),
+        never above quantity x the current price, so an already-inflated listing
+        price cannot be cashed in through legacy rows.
+        """
+        db = self.storage.db
+        async with db.execute("PRAGMA table_info(inventory)") as cur:
+            columns = {row["name"] for row in await cur.fetchall()}
+        if "cost_total" in columns:
+            return
+        await db.execute("ALTER TABLE inventory ADD COLUMN cost_total INTEGER NOT NULL DEFAULT 0")
+        await db.execute("""UPDATE inventory SET cost_total = MIN(
+            quantity * COALESCE((SELECT price FROM market_items WHERE id = inventory.item_id), 0),
+            COALESCE((SELECT -SUM(amount) FROM economy_transactions
+                      WHERE action='buy' AND user_id = inventory.user_id AND item_id = inventory.item_id),
+                     quantity * COALESCE((SELECT price FROM market_items WHERE id = inventory.item_id), 0)))""")
 
     async def account(self, user_id):
         await self.storage.execute("INSERT OR IGNORE INTO economy_accounts(user_id) VALUES(?)",(user_id,))
@@ -97,7 +120,7 @@ class Ledger:
                 if cur.rowcount!=1:
                     raise ValueError("Insufficient points.")
                 await db.execute("UPDATE market_items SET stock=stock-? WHERE id=?",(quantity,item_id))
-                await db.execute("INSERT INTO inventory(user_id,item_id,quantity) VALUES(?,?,?) ON CONFLICT(user_id,item_id) DO UPDATE SET quantity=quantity+excluded.quantity",(user_id,item_id,quantity))
+                await db.execute("INSERT INTO inventory(user_id,item_id,quantity,cost_total) VALUES(?,?,?,?) ON CONFLICT(user_id,item_id) DO UPDATE SET quantity=quantity+excluded.quantity,cost_total=cost_total+excluded.cost_total",(user_id,item_id,quantity,cost))
                 await db.execute("INSERT INTO economy_transactions(user_id,action,amount,item_id) VALUES(?,?,?,?)",(user_id,"buy",-cost,item_id))
                 await db.commit()
                 return cost
@@ -113,14 +136,19 @@ class Ledger:
             db=self.storage.db
             await db.execute("BEGIN IMMEDIATE")
             try:
-                async with db.execute("SELECT price,active FROM market_items WHERE id=?",(item_id,)) as cur:
-                    item=await cur.fetchone()
-                if not item or not item["active"]:
-                    raise ValueError("Item is unavailable.")
-                cur=await db.execute("UPDATE inventory SET quantity=quantity-? WHERE user_id=? AND item_id=? AND quantity>=?",(quantity,user_id,item_id,quantity))
-                if cur.rowcount!=1:
+                # The payout depends only on what the holder paid, never on the
+                # listing's current price or active flag. Owners therefore cannot
+                # mint Points by repricing, nor trap holders by deactivating.
+                async with db.execute("SELECT quantity,cost_total FROM inventory WHERE user_id=? AND item_id=?",(user_id,item_id)) as cur:
+                    held=await cur.fetchone()
+                if not held or held["quantity"]<quantity:
                     raise ValueError("Insufficient inventory.")
-                payout=(item["price"]*75//100)*quantity
+                async with db.execute("SELECT 1 FROM market_items WHERE id=?",(item_id,)) as cur:
+                    if await cur.fetchone() is None:
+                        raise ValueError("Item is unavailable.")
+                basis=held["cost_total"]*quantity//held["quantity"]
+                payout=basis*SELL_RATE_PERCENT//100
+                await db.execute("UPDATE inventory SET quantity=quantity-?,cost_total=cost_total-? WHERE user_id=? AND item_id=?",(quantity,basis,user_id,item_id))
                 await db.execute("UPDATE economy_accounts SET wallet=wallet+? WHERE user_id=?",(payout,user_id))
                 await db.execute("UPDATE market_items SET stock=stock+? WHERE id=?",(quantity,item_id))
                 await db.execute("INSERT INTO economy_transactions(user_id,action,amount,item_id) VALUES(?,?,?,?)",(user_id,"sell",payout,item_id))
