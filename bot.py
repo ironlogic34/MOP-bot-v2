@@ -11,6 +11,7 @@ from core.errors import handle_error
 from modules.error_handling.repositories.error_records import initialize as initialize_errors
 from shared.helpers.events import EventBus
 from modules.economy.services.ledger import Ledger
+from modules.economy.services.credit import initialize as initialize_credit
 from modules.moderation.services.sanctions import initialize as initialize_sanctions
 from modules.moderation.services.channel_overwrites import initialize as initialize_locks
 from modules.server_management.services.member_rules import initialize as initialize_member_rules
@@ -38,6 +39,7 @@ EXTENSIONS = (
     "modules.music.cogs.playback",
     "modules.music.cogs.lastfm",
     "modules.economy.cogs.accounts",
+    "modules.economy.cogs.credit",
     "modules.economy.cogs.market",
     "modules.help.cogs.help",
     "modules.error_handling.cogs.error_monitor",
@@ -61,6 +63,7 @@ class MopBot(commands.Bot):
         install_loop_handler(asyncio.get_running_loop())
         await self.storage.open()
         await self.ledger.initialize()
+        await initialize_credit(self.storage)
         await initialize_sanctions(self.storage)
         await initialize_locks(self.storage)
         await initialize_member_rules(self.storage)
