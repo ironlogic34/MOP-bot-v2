@@ -12,7 +12,7 @@ class General(commands.Cog):
 
     @app_commands.command(description="Check gateway latency.")
     async def ping(self, interaction: discord.Interaction):
-        await interaction.response.send_message(f"MOP gateway latency: {round(self.bot.latency*1000)} ms.",ephemeral=True)
+        await interaction.response.send_message(f"MOP gateway latency: {round(self.bot.latency*1000)} ms. Uptime: {int(time.monotonic()-self.bot.started_at)} seconds.",ephemeral=True)
 
     @app_commands.command(description="Show public Discord member information.")
     @app_commands.guild_only()
@@ -22,6 +22,9 @@ class General(commands.Cog):
         embed.add_field(name="User ID",value=str(member.id))
         embed.add_field(name="Joined Discord",value=discord.utils.format_dt(member.created_at,"D"))
         embed.add_field(name="Joined server",value=discord.utils.format_dt(member.joined_at,"D") if member.joined_at else "Unknown")
+        aliases=await self.bot.storage.rows("SELECT alias FROM user_aliases WHERE user_id=?",(member.id,))
+        if aliases:
+            embed.add_field(name="MOP alias",value=discord.utils.escape_markdown(aliases[0]["alias"]))
         embed.set_thumbnail(url=member.display_avatar.url)
         await interaction.response.send_message(embed=embed,ephemeral=True)
 
@@ -38,11 +41,12 @@ class General(commands.Cog):
     @app_commands.default_permissions(manage_messages=True)
     @app_commands.guild_only()
     @app_commands.checks.has_permissions(manage_messages=True)
-    async def echo(self, interaction: discord.Interaction, message: str, channel: discord.TextChannel | None = None):
+    async def echo(self, interaction: discord.Interaction, message: str, channel: discord.TextChannel | None = None, repeats: app_commands.Range[int,1,3] = 1):
         require_staff(interaction)
         channel = channel or interaction.channel
-        await channel.send(message,allowed_mentions=SAFE_MENTIONS)
-        await self.bot.storage.log(interaction.guild_id,interaction.user.id,channel.id,"echo",message[:200])
+        for _ in range(repeats):
+            await channel.send(message[:1900],allowed_mentions=SAFE_MENTIONS)
+        await self.bot.storage.log(interaction.guild_id,interaction.user.id,channel.id,"echo",f"{repeats}x: {message[:180]}")
         await interaction.response.send_message("Announcement sent.",ephemeral=True)
 
 async def setup(bot):
