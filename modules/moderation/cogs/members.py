@@ -12,6 +12,7 @@ class Members(commands.Cog):
     @app_commands.command(description="Ban a member from this server.")
     @app_commands.default_permissions(ban_members=True)
     @app_commands.guild_only()
+    @app_commands.checks.has_permissions(ban_members=True)
     async def ban(self, interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
         check_hierarchy(interaction.user, member, interaction.guild.me)
         await interaction.guild.ban(member, reason=reason)
@@ -21,6 +22,7 @@ class Members(commands.Cog):
     @app_commands.command(description="Unban a user by Discord ID.")
     @app_commands.default_permissions(ban_members=True)
     @app_commands.guild_only()
+    @app_commands.checks.has_permissions(ban_members=True)
     async def unban(self, interaction: discord.Interaction, user_id: str):
         user = await self.bot.fetch_user(int(user_id))
         await interaction.guild.unban(user)
@@ -30,6 +32,7 @@ class Members(commands.Cog):
     @app_commands.command(description="Kick a member from this server.")
     @app_commands.default_permissions(kick_members=True)
     @app_commands.guild_only()
+    @app_commands.checks.has_permissions(kick_members=True)
     async def kick(self, interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
         check_hierarchy(interaction.user, member, interaction.guild.me)
         await member.kick(reason=reason)
@@ -39,6 +42,7 @@ class Members(commands.Cog):
     @app_commands.command(description="Timeout a member for a specified number of minutes.")
     @app_commands.default_permissions(moderate_members=True)
     @app_commands.guild_only()
+    @app_commands.checks.has_permissions(moderate_members=True)
     async def mute(self, interaction: discord.Interaction, member: discord.Member, minutes: app_commands.Range[int,1,40320], reason: str = "No reason provided"):
         check_hierarchy(interaction.user, member, interaction.guild.me)
         await member.timeout(timedelta(minutes=minutes), reason=reason)
@@ -48,6 +52,7 @@ class Members(commands.Cog):
     @app_commands.command(description="Remove a member's timeout.")
     @app_commands.default_permissions(moderate_members=True)
     @app_commands.guild_only()
+    @app_commands.checks.has_permissions(moderate_members=True)
     async def unmute(self, interaction: discord.Interaction, member: discord.Member):
         check_hierarchy(interaction.user, member, interaction.guild.me)
         await member.timeout(None)
@@ -57,6 +62,7 @@ class Members(commands.Cog):
     @app_commands.command(description="Change a member's server nickname.")
     @app_commands.default_permissions(manage_nicknames=True)
     @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_nicknames=True)
     async def nickname(self, interaction: discord.Interaction, member: discord.Member, name: str):
         check_hierarchy(interaction.user, member, interaction.guild.me)
         await member.edit(nick=name[:32])
@@ -66,6 +72,7 @@ class Members(commands.Cog):
     @app_commands.default_permissions(manage_roles=True)
     @app_commands.guild_only()
     @app_commands.choices(operation=[app_commands.Choice(name="Add",value="add"),app_commands.Choice(name="Remove",value="remove")])
+    @app_commands.checks.has_permissions(manage_roles=True)
     async def role(self, interaction: discord.Interaction, member: discord.Member, role: discord.Role, operation: app_commands.Choice[str]):
         check_hierarchy(interaction.user, member, interaction.guild.me)
         if role >= interaction.guild.me.top_role or (interaction.user.id != interaction.guild.owner_id and role >= interaction.user.top_role):
