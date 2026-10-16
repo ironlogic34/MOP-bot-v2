@@ -12,6 +12,7 @@ class Automation(commands.Cog):
     @app_commands.command(description="Add or update an automatic reply rule.")
     @app_commands.default_permissions(manage_guild=True)
     @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
     async def autoresponder(self, interaction: discord.Interaction, trigger: str, response: str):
         require_staff(interaction)
         await self.bot.storage.execute("INSERT OR REPLACE INTO responders(guild_id,trigger,response) VALUES(?,?,?)",
@@ -21,6 +22,7 @@ class Automation(commands.Cog):
     @app_commands.command(description="Add an automatic reaction rule.")
     @app_commands.default_permissions(manage_guild=True)
     @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
     async def autoreact(self, interaction: discord.Interaction, trigger: str, emoji: str):
         require_staff(interaction)
         await self.bot.storage.execute("INSERT OR IGNORE INTO reactions(guild_id,trigger,emoji) VALUES(?,?,?)",
