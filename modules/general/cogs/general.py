@@ -4,6 +4,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from core.permissions import require_staff
+from shared.security.mentions import SAFE_MENTIONS
 
 class General(commands.Cog):
     def __init__(self, bot):
@@ -38,7 +39,7 @@ class General(commands.Cog):
     async def echo(self, interaction: discord.Interaction, message: str, channel: discord.TextChannel | None = None):
         require_staff(interaction)
         channel = channel or interaction.channel
-        await channel.send(message,allowed_mentions=discord.AllowedMentions.none())
+        await channel.send(message,allowed_mentions=SAFE_MENTIONS)
         await self.bot.storage.log(interaction.guild_id,interaction.user.id,channel.id,"echo",message[:200])
         await interaction.response.send_message("Announcement sent.",ephemeral=True)
 
