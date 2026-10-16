@@ -18,7 +18,13 @@ class Ledger:
     async def initialize(self):
         async with self.storage.lock:
             await self.storage.db.executescript(SCHEMA)
-            await self.storage.db.commit()
+            async with self.storage.db.execute("PRAGMA table_info(inventory)") as cursor:
+            columns = {row["name"] for row in await cursor.fetchall()}
+        if "cost_total" not in columns:
+            await self.storage.db.execute("ALTER TABLE inventory ADD COLUMN cost_total INTEGER NOT NULL DEFAULT 0 CHECK(cost_total>=0)")
+            await self.storage.db.execute("""UPDATE inventory SET cost_total=quantity*
+                COALESCE((SELECT price FROM market_items WHERE market_items.id=inventory.item_id),0)""")
+        await self.storage.db.commit()
 
     async def account(self, user_id):
         await self.storage.execute("INSERT OR IGNORE INTO economy_accounts(user_id) VALUES(?)",(user_id,))
@@ -97,7 +103,7 @@ class Ledger:
                 if cur.rowcount!=1:
                     raise ValueError("Insufficient points.")
                 await db.execute("UPDATE market_items SET stock=stock-? WHERE id=?",(quantity,item_id))
-                await db.execute("INSERT INTO inventory(user_id,item_id,quantity) VALUES(?,?,?) ON CONFLICT(user_id,item_id) DO UPDATE SET quantity=quantity+excluded.quantity",(user_id,item_id,quantity))
+                await db.execute("INSERT INTO inventory(user_id,item_id,quantity,cost_total) VALUES(?,?,?,?) ON CONFLICT(user_id,item_id) DO UPDATE SET quantity=quantity+excluded.quantity,cost_total=cost_total+excluded.cost_total",(user_id,item_id,quantity,cost))
                 await db.execute("INSERT INTO economy_transactions(user_id,action,amount,item_id) VALUES(?,?,?,?)",(user_id,"buy",-cost,item_id))
                 await db.commit()
                 return cost
@@ -113,14 +119,19 @@ class Ledger:
             db=self.storage.db
             await db.execute("BEGIN IMMEDIATE")
             try:
-                async with db.execute("SELECT price,active FROM market_items WHERE id=?",(item_id,)) as cur:
+                async with db.execute("SELECT id FROM market_items WHERE id=?",(item_id,)) as cur:
                     item=await cur.fetchone()
-                if not item or not item["active"]:
-                    raise ValueError("Item is unavailable.")
-                cur=await db.execute("UPDATE inventory SET quantity=quantity-? WHERE user_id=? AND item_id=? AND quantity>=?",(quantity,user_id,item_id,quantity))
+                if not item:
+                    raise ValueError("Item does not exist.")
+                async with db.execute("SELECT quantity,cost_total FROM inventory WHERE user_id=? AND item_id=?",(user_id,item_id)) as cur:
+                    holding=await cur.fetchone()
+                if not holding or holding["quantity"]<quantity:
+                    raise ValueError("Insufficient inventory.")
+                basis=holding["cost_total"]*quantity//holding["quantity"]
+                cur=await db.execute("UPDATE inventory SET quantity=quantity-?,cost_total=cost_total-? WHERE user_id=? AND item_id=? AND quantity>=?",(quantity,basis,user_id,item_id,quantity))
                 if cur.rowcount!=1:
                     raise ValueError("Insufficient inventory.")
-                payout=(item["price"]*75//100)*quantity
+                payout=basis*75//100
                 await db.execute("UPDATE economy_accounts SET wallet=wallet+? WHERE user_id=?",(payout,user_id))
                 await db.execute("UPDATE market_items SET stock=stock+? WHERE id=?",(quantity,item_id))
                 await db.execute("INSERT INTO economy_transactions(user_id,action,amount,item_id) VALUES(?,?,?,?)",(user_id,"sell",payout,item_id))
