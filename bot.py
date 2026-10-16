@@ -7,6 +7,7 @@ from discord.ext import commands
 from dotenv import load_dotenv
 from core.database import Database
 from core.errors import handle_error
+from modules.error_handling.repositories.error_records import initialize as initialize_errors
 from shared.helpers.events import EventBus
 from modules.economy.services.ledger import Ledger
 from modules.moderation.services.sanctions import initialize as initialize_sanctions
@@ -55,6 +56,7 @@ class MopBot(commands.Bot):
         await self.storage.open()
         await self.ledger.initialize()
         await initialize_sanctions(self.storage)
+        await initialize_errors(self.storage)
         await initialize_utility(self.storage)
         for extension in EXTENSIONS:
             await self.load_extension(extension)
