@@ -32,3 +32,10 @@ The previously empty module folders now contain working initial implementations 
 - **Background errors:** loop-level handler and cog event error monitoring. Persistent structured error records, redaction and recovery pending.
 
 **Security:** Set `MUSIC_ALLOWED_HOSTS` only to domains you trust for direct audio streaming. An allowlist alone does not fully protect against DNS rebinding or redirects; audio source handling needs additional hardening before public deployment. Real secrets belong only in local `.env`, not Git.
+
+## Current completion pass (October 2026)
+This pass adds a **restart-persistent moderation sanction scheduler**, timed ban cancellation, warning-threshold escalation (default three warnings and a 24-hour ban), a per-server /audit viewer, a sanitized persistent error-record repository, and an actual /bug error viewer. Sanction tests cover replacement, cancellation, duration validation, and guild isolation.
+
+**Not a complete implementation.** Remaining specification gaps include advanced moderation commands and retention, comprehensive server management (backup, appeals, ticket workflows, autoroles), full general command behavior, utility delivery semantics, economy administration/credit/loan, permission-aware help, and durable background infrastructure. Music remains deferred. The shared package still lacks durable events and persistent UI. No live Discord integration tests have been run.
+
+A green compile/import/unit-test workflow does not establish production readiness.
