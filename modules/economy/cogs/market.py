@@ -3,6 +3,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from core.ui import Pages
+from shared.validators.text import normalized_product_name
 
 class Market(commands.Cog):
     def __init__(self,bot):
@@ -23,7 +24,7 @@ class Market(commands.Cog):
     async def additem(self,interaction:discord.Interaction,name:app_commands.Range[str,2,70],price:app_commands.Range[int,1,100000000],stock:app_commands.Range[int,1,100000],description:app_commands.Range[str,1,500]):
         if interaction.user.id!=interaction.guild.owner_id:
             raise app_commands.CheckFailure("Only the server owner can publish listings.")
-        normalized=" ".join(name.casefold().split())
+        normalized=normalized_product_name(name)
         try:
             ident=await self.bot.storage.execute("INSERT INTO market_items(guild_id,owner_id,name,normalized_name,description,price,stock) VALUES(?,?,?,?,?,?,?)",
               (interaction.guild_id,interaction.user.id,name.strip(),normalized,description,price,stock))
