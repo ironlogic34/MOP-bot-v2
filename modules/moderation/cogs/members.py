@@ -3,7 +3,8 @@ from datetime import timedelta
 import discord
 from discord import app_commands
 from discord.ext import commands
-from core.permissions import check_hierarchy
+from shared.validators.permissions import require_role_hierarchy as check_hierarchy
+from shared.validators.text import parse_discord_id
 
 class Members(commands.Cog):
     def __init__(self, bot):
@@ -24,7 +25,7 @@ class Members(commands.Cog):
     @app_commands.guild_only()
     @app_commands.checks.has_permissions(ban_members=True)
     async def unban(self, interaction: discord.Interaction, user_id: str):
-        user = await self.bot.fetch_user(int(user_id))
+        user = await self.bot.fetch_user(parse_discord_id(user_id))
         await interaction.guild.unban(user)
         await self.bot.storage.log(interaction.guild_id, interaction.user.id, user.id, "unban")
         await interaction.response.send_message(f"Unbanned {user}.", ephemeral=True)
