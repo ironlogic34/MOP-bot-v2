@@ -18,6 +18,7 @@ class Support(commands.Cog):
     @app_commands.command(description="Show the latest stored moderation actions.")
     @app_commands.default_permissions(manage_guild=True)
     @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
     async def logs(self, interaction: discord.Interaction):
         rows = await self.bot.storage.rows("SELECT action,created_at FROM actions WHERE guild_id=? ORDER BY id DESC LIMIT 10",(interaction.guild_id,))
         await interaction.response.send_message("\n".join(f"{r['created_at']}: {r['action']}" for r in rows) or "No logged actions.",ephemeral=True)
