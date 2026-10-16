@@ -62,5 +62,29 @@ class Market(commands.Cog):
         view=Paginator("Your inventory",[f"#{r['item_id']} {r['name']} × {r['quantity']}" for r in rows],owner_id=interaction.user.id)
         await interaction.response.send_message(embed=view.embed(),view=view,ephemeral=True)
 
+
+    @app_commands.command(description="Edit or deactivate a marketplace listing you own.")
+    @app_commands.guild_only()
+    async def edititem(self, interaction:discord.Interaction, item_id:int, price:app_commands.Range[int,1,100000000]|None=None, stock:app_commands.Range[int,0,100000]|None=None, active:bool|None=None, description:app_commands.Range[str,1,500]|None=None):
+        rows=await self.bot.storage.rows("SELECT owner_id,guild_id FROM market_items WHERE id=?",(item_id,))
+        if not rows or rows[0]["owner_id"]!=interaction.user.id or rows[0]["guild_id"]!=interaction.guild_id:
+            raise app_commands.CheckFailure("Only the original listing owner can manage this server's listing.")
+        changes={"price":price,"stock":stock,"active":int(active) if active is not None else None,"description":description}
+        selected={key:value for key,value in changes.items() if value is not None}
+        if not selected:
+            await interaction.response.send_message("Supply at least one field to change.",ephemeral=True)
+            return
+        columns=", ".join(f"{key}=?" for key in selected)
+        await self.bot.storage.execute(f"UPDATE market_items SET {columns} WHERE id=? AND owner_id=? AND guild_id=?",(*selected.values(),item_id,interaction.user.id,interaction.guild_id))
+        await interaction.response.send_message(f"Updated item #{item_id}.",ephemeral=True)
+
+    @app_commands.command(description="View the listings you published in this server.")
+    @app_commands.guild_only()
+    async def myitems(self, interaction:discord.Interaction):
+        rows=await self.bot.storage.rows("SELECT id,name,price,stock,active FROM market_items WHERE owner_id=? AND guild_id=? ORDER BY id DESC LIMIT 100",(interaction.user.id,interaction.guild_id))
+        lines=[f"#{r['id']} {discord.utils.escape_markdown(r['name'])}: {r['price']} Points, {r['stock']} stock, {'active' if r['active'] else 'inactive'}" for r in rows]
+        view=Paginator("My marketplace listings",lines,owner_id=interaction.user.id)
+        await interaction.response.send_message(embed=view.embed(),view=view,ephemeral=True)
+
 async def setup(bot):
     await bot.add_cog(Market(bot))
