@@ -12,6 +12,7 @@ class Warnings(commands.Cog):
     @app_commands.command(description="Issue a persistent warning to a member.")
     @app_commands.default_permissions(moderate_members=True)
     @app_commands.guild_only()
+    @app_commands.checks.has_permissions(moderate_members=True)
     async def warn(self, interaction: discord.Interaction, member: discord.Member, reason: str):
         check_hierarchy(interaction.user, member, interaction.guild.me)
         ident = await self.bot.storage.execute("INSERT INTO warnings(guild_id,user_id,moderator_id,reason) VALUES(?,?,?,?)",
@@ -22,6 +23,7 @@ class Warnings(commands.Cog):
     @app_commands.command(description="Show recorded warnings for a member.")
     @app_commands.default_permissions(moderate_members=True)
     @app_commands.guild_only()
+    @app_commands.checks.has_permissions(moderate_members=True)
     async def warnhistory(self, interaction: discord.Interaction, member: discord.Member):
         rows = await self.bot.storage.rows("SELECT id,reason,created_at FROM warnings WHERE guild_id=? AND user_id=? ORDER BY id DESC LIMIT 100",
             (interaction.guild_id,member.id))
@@ -31,6 +33,7 @@ class Warnings(commands.Cog):
     @app_commands.command(description="Show moderation actions taken by staff.")
     @app_commands.default_permissions(moderate_members=True)
     @app_commands.guild_only()
+    @app_commands.checks.has_permissions(moderate_members=True)
     async def modhistory(self, interaction: discord.Interaction):
         rows = await self.bot.storage.rows("SELECT action,actor_id,target_id,created_at FROM actions WHERE guild_id=? ORDER BY id DESC LIMIT 100",(interaction.guild_id,))
         view = Pages("Moderation history",[f"{r['created_at']} • {r['action']} • <@{r['actor_id']}> → {r['target_id']}" for r in rows])
