@@ -36,7 +36,7 @@ class Warnings(commands.Cog):
     @app_commands.checks.has_permissions(moderate_members=True)
     async def modhistory(self, interaction: discord.Interaction):
         rows = await self.bot.storage.rows("SELECT action,actor_id,target_id,created_at FROM actions WHERE guild_id=? ORDER BY id DESC LIMIT 100",(interaction.guild_id,))
-        view = Paginator("Moderation history",[f"{r['created_at']} • {r['action']} • <@{r['actor_id']}> → {r['target_id']}" for r in rows])
+        view = Paginator("Moderation history",[f"{r['created_at']} • {r['action']} • <@{r['actor_id']}> → {r['target_id']}" for r in rows],owner_id=interaction.user.id)
         await interaction.response.send_message(embed=view.embed(),view=view,ephemeral=True)
 
 async def setup(bot):
