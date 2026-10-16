@@ -10,6 +10,7 @@ from core.database import Database
 from core.errors import handle_error
 from modules.error_handling.repositories.error_records import initialize as initialize_errors
 from shared.helpers.events import EventBus
+from shared.helpers.durable_jobs import initialize as initialize_jobs
 from modules.economy.services.ledger import Ledger
 from modules.economy.services.credit import initialize as initialize_credit
 from modules.moderation.services.sanctions import initialize as initialize_sanctions
@@ -35,6 +36,7 @@ EXTENSIONS = (
     "modules.server_management.cogs.support",
     "modules.server_management.cogs.member_rules",
     "modules.server_management.cogs.appeals",
+    "modules.server_management.cogs.jobs",
     "modules.utility.cogs.reminders",
     "modules.utility.cogs.channel_tools",
     "modules.utility.cogs.conversion",
@@ -70,6 +72,7 @@ class MopBot(commands.Bot):
         await initialize_locks(self.storage)
         await initialize_member_rules(self.storage)
         await initialize_support(self.storage)
+        await initialize_jobs(self.storage)
         await initialize_errors(self.storage)
         await initialize_utility(self.storage)
         for extension in EXTENSIONS:

@@ -1,12 +1,11 @@
-"""Persistent server ticket and appeal records with safe per-guild ownership."""
-from datetime import datetime,timezone
+"""Persistent ban-appeal records with safe per-guild ownership."""
+from datetime import datetime,timedelta,timezone
+
+MIN_GAP_HOURS = 24
+WINDOW_DAYS = 30
+MAX_PER_WINDOW = 3
 
 SCHEMA = """
-CREATE TABLE IF NOT EXISTS ticket_messages(
- id INTEGER PRIMARY KEY AUTOINCREMENT, ticket_id INTEGER NOT NULL,
- author_id INTEGER NOT NULL, message TEXT NOT NULL,
- created_at TEXT DEFAULT CURRENT_TIMESTAMP
-);
 CREATE TABLE IF NOT EXISTS ban_appeals(
  id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id INTEGER NOT NULL,
  user_id INTEGER NOT NULL, reason TEXT NOT NULL,
@@ -23,17 +22,21 @@ async def initialize(storage):
         await storage.db.commit()
 
 async def create_appeal(storage,guild_id,user_id,reason):
+    """One pending appeal at a time, 24h apart, at most 3 per rolling 30 days (per server)."""
     now=datetime.now(timezone.utc)
     async with storage.lock:
         db=storage.db
         await db.execute("BEGIN IMMEDIATE")
         try:
-            async with db.execute("SELECT created_at FROM ban_appeals WHERE guild_id=? AND user_id=? ORDER BY id DESC LIMIT 3",(guild_id,user_id)) as cur:
+            async with db.execute("SELECT created_at,status FROM ban_appeals WHERE guild_id=? AND user_id=? ORDER BY id DESC LIMIT 50",(guild_id,user_id)) as cur:
                 rows=await cur.fetchall()
-            if len(rows)>=3:
-                raise ValueError("Maximum of three appeals per server.")
-            if rows and (now-datetime.fromisoformat(rows[0]["created_at"])).total_seconds()<86400:
-                raise ValueError("Wait 24 hours between appeals.")
+            if any(r["status"]=="pending" for r in rows):
+                raise ValueError("You already have a pending appeal for this server.")
+            created=[datetime.fromisoformat(r["created_at"]) for r in rows]
+            if created and now-created[0]<timedelta(hours=MIN_GAP_HOURS):
+                raise ValueError(f"Wait {MIN_GAP_HOURS} hours between appeals.")
+            if sum(1 for c in created if now-c<timedelta(days=WINDOW_DAYS))>=MAX_PER_WINDOW:
+                raise ValueError(f"Maximum of {MAX_PER_WINDOW} appeals per {WINDOW_DAYS} days for this server.")
             cur=await db.execute("INSERT INTO ban_appeals(guild_id,user_id,reason,created_at) VALUES(?,?,?,?)",(guild_id,user_id,reason[:1500],now.isoformat()))
             await db.commit()
             return cur.lastrowid
