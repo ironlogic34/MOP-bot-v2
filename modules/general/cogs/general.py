@@ -30,7 +30,9 @@ class General(commands.Cog):
     @app_commands.guild_only()
     @app_commands.checks.has_permissions(manage_guild=True)
     async def bug(self, interaction: discord.Interaction):
-        await interaction.response.send_message("Error details are written to the application logs. This initial build does not yet provide an error-log viewer.",ephemeral=True)
+        rows = await self.bot.storage.rows("SELECT id,command_name,error_type,summary,created_at FROM error_records WHERE guild_id=? ORDER BY id DESC LIMIT 10",(interaction.guild_id,))
+        lines = [f"#{r['id']} {r['created_at']} /{r['command_name']}: {r['error_type']} ({r['summary'][:100]})" for r in rows]
+        await interaction.response.send_message("\n".join(lines)[:1900] or "No recorded errors for this server.",ephemeral=True)
 
     @app_commands.command(description="Send a staff announcement to a channel.")
     @app_commands.default_permissions(manage_messages=True)
