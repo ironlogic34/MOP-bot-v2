@@ -18,6 +18,7 @@ class History(commands.Cog):
     @app_commands.command(description="Show a member's recorded activity and warnings.")
     @app_commands.default_permissions(moderate_members=True)
     @app_commands.guild_only()
+    @app_commands.checks.has_permissions(moderate_members=True)
     async def history(self, interaction: discord.Interaction, member: discord.Member):
         activity = await self.bot.storage.rows("SELECT words,messages FROM activity WHERE guild_id=? AND user_id=?",(interaction.guild_id,member.id))
         warns = await self.bot.storage.rows("SELECT COUNT(*) AS n FROM warnings WHERE guild_id=? AND user_id=?",(interaction.guild_id,member.id))
@@ -27,6 +28,7 @@ class History(commands.Cog):
     @app_commands.command(description="Show recent staff action totals.")
     @app_commands.default_permissions(moderate_members=True)
     @app_commands.guild_only()
+    @app_commands.checks.has_permissions(moderate_members=True)
     async def mkdstat(self, interaction: discord.Interaction):
         rows = await self.bot.storage.rows("SELECT action,COUNT(*) AS n FROM actions WHERE guild_id=? GROUP BY action ORDER BY n DESC",(interaction.guild_id,))
         await interaction.response.send_message("\n".join(f"{r['action']}: {r['n']}" for r in rows) or "No recorded actions.",ephemeral=True)
