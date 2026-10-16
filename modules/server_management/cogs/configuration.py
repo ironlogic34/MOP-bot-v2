@@ -26,10 +26,16 @@ class Configuration(commands.Cog):
 
     @app_commands.command(description="Create an invite to the current server.")
     @app_commands.guild_only()
+    @app_commands.checks.cooldown(1, 60, key=lambda i: (i.guild_id, i.user.id))
     async def invite(self, interaction: discord.Interaction):
         channel = interaction.channel
         if not isinstance(channel, discord.TextChannel):
             raise app_commands.CheckFailure("Use a text channel.")
+        # MOP must not hand out invites its requester could not create themselves.
+        if not channel.permissions_for(interaction.user).create_instant_invite:
+            raise app_commands.CheckFailure("You need the Create Invite permission in this channel.")
+        if not channel.permissions_for(interaction.guild.me).create_instant_invite:
+            raise app_commands.CheckFailure("MOP needs the Create Invite permission in this channel.")
         invite = await channel.create_invite(max_age=3600,max_uses=1,reason=f"Requested by {interaction.user}")
         await interaction.response.send_message(invite.url,ephemeral=True)
 

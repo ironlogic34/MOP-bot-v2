@@ -3,6 +3,7 @@ from datetime import datetime,timezone
 import discord
 from discord import app_commands
 from discord.ext import commands
+from modules.server_management.services.member_rules import record_opt_out,get_opt_out,delete_opt_out
 from shared.validators.text import bounded_text
 
 class MemberRules(commands.Cog):
@@ -51,10 +52,28 @@ class MemberRules(commands.Cog):
             raise app_commands.CheckFailure("Text channel required.")
         if not channel.permissions_for(interaction.guild.me).manage_roles:
             raise app_commands.CheckFailure("MOP needs Manage Roles in this channel.")
+        storage=self.bot.storage
         overwrite=channel.overwrites_for(interaction.user)
-        overwrite.send_messages=None if restore else False
-        await channel.set_permissions(interaction.user,overwrite=overwrite,reason="Voluntary channel writing restriction")
-        await interaction.response.send_message("Your writing permission has been restored to inherited settings." if restore else "You opted out of writing in this channel. Use /leave restore:true to return.",ephemeral=True)
+        if not restore:
+            if not await record_opt_out(storage,interaction.guild_id,channel.id,interaction.user.id,overwrite.send_messages):
+                await interaction.response.send_message("You already opted out of this channel. Use /leave restore:true to return.",ephemeral=True)
+                return
+            overwrite.send_messages=False
+            try:
+                await channel.set_permissions(interaction.user,overwrite=overwrite,reason="Voluntary channel writing restriction")
+            except discord.HTTPException:
+                await delete_opt_out(storage,interaction.guild_id,channel.id,interaction.user.id)
+                raise
+            await interaction.response.send_message("You opted out of writing in this channel. Use /leave restore:true to return.",ephemeral=True)
+            return
+        found,original=await get_opt_out(storage,interaction.guild_id,channel.id,interaction.user.id)
+        if not found:
+            await interaction.response.send_message("Nothing to restore: MOP has no opt-out recorded for you in this channel. If staff restricted you, ask them to lift it.",ephemeral=True)
+            return
+        overwrite.send_messages=original
+        await channel.set_permissions(interaction.user,overwrite=None if overwrite.is_empty() else overwrite,reason="Voluntary channel opt-out ended")
+        await delete_opt_out(storage,interaction.guild_id,channel.id,interaction.user.id)
+        await interaction.response.send_message("Your previous writing permission in this channel has been restored.",ephemeral=True)
 
     @app_commands.command(description="Show members Discord currently reports as streaming.")
     @app_commands.guild_only()
