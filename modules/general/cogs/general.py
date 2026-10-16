@@ -27,12 +27,14 @@ class General(commands.Cog):
     @app_commands.command(description="Show a summary of the bot's current status.")
     @app_commands.default_permissions(manage_guild=True)
     @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
     async def bug(self, interaction: discord.Interaction):
         await interaction.response.send_message("Error details are written to the application logs. This initial build does not yet provide an error-log viewer.",ephemeral=True)
 
     @app_commands.command(description="Send a staff announcement to a channel.")
     @app_commands.default_permissions(manage_messages=True)
     @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_messages=True)
     async def echo(self, interaction: discord.Interaction, message: str, channel: discord.TextChannel | None = None):
         require_staff(interaction)
         channel = channel or interaction.channel
