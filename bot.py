@@ -7,6 +7,7 @@ from discord.ext import commands
 from dotenv import load_dotenv
 from core.database import Database
 from core.errors import handle_error
+from shared.helpers.events import EventBus
 from modules.economy.services.ledger import Ledger
 from modules.utility.services.schema import initialize as initialize_utility
 from modules.music.services.player import Player
@@ -44,6 +45,7 @@ class MopBot(commands.Bot):
         self.tree.on_error = handle_error
         self.ledger = Ledger(self.storage)
         self.player = Player()
+        self.events = EventBus()
 
     async def setup_hook(self):
         install_loop_handler(asyncio.get_running_loop())
