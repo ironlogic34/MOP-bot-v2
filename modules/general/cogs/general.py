@@ -44,6 +44,11 @@ class General(commands.Cog):
     async def echo(self, interaction: discord.Interaction, message: str, channel: discord.TextChannel | None = None, repeats: app_commands.Range[int,1,3] = 1):
         require_staff(interaction)
         channel = channel or interaction.channel
+        # MOP must not post where the requesting staff member could not post themselves.
+        if not channel.permissions_for(interaction.user).send_messages:
+            raise app_commands.CheckFailure("You cannot send messages in that channel.")
+        if not channel.permissions_for(interaction.guild.me).send_messages:
+            raise app_commands.CheckFailure("MOP cannot send messages in that channel.")
         for _ in range(repeats):
             await channel.send(message[:1900],allowed_mentions=SAFE_MENTIONS)
         await self.bot.storage.log(interaction.guild_id,interaction.user.id,channel.id,"echo",f"{repeats}x: {message[:180]}")

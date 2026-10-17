@@ -37,6 +37,7 @@ EXTENSIONS = (
     "modules.server_management.cogs.member_rules",
     "modules.server_management.cogs.appeals",
     "modules.server_management.cogs.jobs",
+    "modules.server_management.cogs.staff_inbox",
     "modules.utility.cogs.reminders",
     "modules.utility.cogs.channel_tools",
     "modules.utility.cogs.conversion",

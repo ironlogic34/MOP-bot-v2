@@ -53,6 +53,8 @@ class AdvancedChannels(commands.Cog):
         channel=interaction.channel
         if not isinstance(channel,discord.TextChannel):
             raise app_commands.CheckFailure("Text channel required.")
+        if role >= interaction.guild.me.top_role or (interaction.user.id != interaction.guild.owner_id and role>=interaction.user.top_role):
+            raise app_commands.CheckFailure("Role hierarchy prevents this change.")
         overwrite=channel.overwrites_for(role)
         overwrite.view_channel=False if hidden else None
         await channel.set_permissions(role,overwrite=overwrite,reason=f"MOP hide by {interaction.user}")

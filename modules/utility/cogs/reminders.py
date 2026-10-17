@@ -1,9 +1,13 @@
 """Persistent scheduled reminders and private moderation notifications."""
-import asyncio
+import logging
 from datetime import datetime, timedelta, timezone
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
+from modules.utility.services.reminder_delivery import PermanentDeliveryError, deliver_due
+from shared.helpers.rate_limit import enforce_hourly_limit
+
+log = logging.getLogger("mop.reminders")
 
 class Reminders(commands.Cog):
     def __init__(self,bot):
@@ -23,21 +27,28 @@ class Reminders(commands.Cog):
     @app_commands.command(description="Privately report a concern to this server's staff.")
     @app_commands.guild_only()
     async def notify(self,interaction:discord.Interaction,description:app_commands.Range[str,5,1000]):
+        try:
+            await enforce_hourly_limit(self.bot.storage,"reports",interaction.guild_id,interaction.user.id,limit=3,label="reports")
+        except ValueError as exc:
+            await interaction.response.send_message(str(exc),ephemeral=True)
+            return
         ident=await self.bot.storage.execute("INSERT INTO reports(guild_id,user_id,description) VALUES(?,?,?)",
           (interaction.guild_id,interaction.user.id,description))
         await interaction.response.send_message(f"Report #{ident} recorded for staff review.",ephemeral=True)
 
+    async def send_dm(self,user_id,message):
+        try:
+            user=await self.bot.fetch_user(user_id)
+            await user.send(f"⏰ Reminder: {message}")
+        except (discord.Forbidden,discord.NotFound) as exc:
+            raise PermanentDeliveryError() from exc
+
     @tasks.loop(seconds=30)
     async def worker(self):
-        now=datetime.now(timezone.utc).isoformat()
-        rows=await self.bot.storage.rows("SELECT id,user_id,channel_id,message FROM reminders WHERE due_at<=? AND sent=0 ORDER BY id LIMIT 20",(now,))
-        for row in rows:
-            claimed=await self.bot.storage.execute("UPDATE reminders SET sent=1 WHERE id=? AND sent=0",(row["id"],))
-            try:
-                user=await self.bot.fetch_user(row["user_id"])
-                await user.send(f"⏰ Reminder: {row['message']}")
-            except discord.HTTPException:
-                pass
+        try:
+            await deliver_due(self.bot.storage,self.send_dm)
+        except Exception:
+            log.exception("Reminder pass failed")
 
     @worker.before_loop
     async def before_worker(self):
